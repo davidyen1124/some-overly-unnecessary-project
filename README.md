@@ -1,5 +1,7 @@
 # 🥣 S.O.U.P. (Some Overly Unnecessary Project) 🥣
 
+![SOUP Demo](assets/demo.gif)
+
 Ever felt like your life was missing a random, resource-hogging, visually bewildering piece of software? No? Well, too bad—here it is anyway!
 
 Welcome to **S.O.U.P.**: a React + Vite extravaganza that simulates, um, soup. Yes, soup. Because we’re 100% sure the internet _needed_ another 3D, swirling, steam-puffing, GPU-melting soup scene.
