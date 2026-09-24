@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Blender autosave backups
+*.blend1
+*.blend2

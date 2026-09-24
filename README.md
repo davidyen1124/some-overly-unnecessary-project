@@ -55,3 +55,49 @@ We have absolutely no illusions of this changing the world. But hey, if **pear.a
 Enjoy!
 
 — Made with zero shame and a heaping spoonful of sarcasm.
+
+
+## Freshly made in Blender
+
+The soup is now a textured Blender model: a closed, hand-thrown stoneware bowl,
+rippled broth and meniscus, curled noodles, two half-eggs, scored shiitakes with
+gills, leafy greens, sliced scallions, sesame, chili flakes, and oil droplets.
+All geometry and texture maps are original, generated locally without external assets.
+
+- **Editable source:** [`assets/blender/realistic-soup.blend`](assets/blender/realistic-soup.blend).
+- **Web model:** [`public/models/realistic-soup.glb`](public/models/realistic-soup.glb).
+- **Rebuild script:** [`assets/blender/create_soup.py`](assets/blender/create_soup.py).
+
+The GLB embeds its color, roughness, normal, and baked contact-occlusion textures and uses glTF PBR
+materials with clearcoat. The floating scene draws the shared model with twelve
+instanced meshes. Close-up mode adds orbit/zoom controls, contact shadows, and
+soft steam. Pause and the operating system's reduced-motion setting suspend the
+render loop; orbiting remains available. The model can be downloaded from the site.
+
+### Regenerate the model
+
+Tested with Blender 5.2.1 LTS. From the repository root:
+
+```sh
+blender --background --python assets/blender/create_soup.py
+```
+
+On macOS, the executable is typically
+`/Applications/Blender.app/Contents/MacOS/Blender`. Set `SOUP_RENDER` to an absolute
+PNG path to also render the studio scene. The script saves both the packed,
+editable `.blend` and the `.glb`; studio lights, camera, and floor are excluded
+from the GLB. Commit both files after changing the model.
+
+### Check and deploy
+
+```sh
+npm ci
+npm run lint
+npm run build
+npm run preview -- --host 127.0.0.1
+```
+
+Open `/some-overly-unnecessary-project/` on the preview server. Check both scene
+modes, orbit/zoom, pause/resume, reduced motion, a portrait phone viewport, and the
+GLB download. Model URLs use Vite's configured base path so they work on Pages.
+Pushing `main` runs the build workflow and deploys `dist` to GitHub Pages.

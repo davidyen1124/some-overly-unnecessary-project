@@ -1,366 +1,205 @@
 import * as THREE from 'three'
-import { useRef, useState, useEffect } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Environment } from '@react-three/drei'
-import {
-  EffectComposer,
-  DepthOfField,
-  ToneMapping
-} from '@react-three/postprocessing'
-import { nanoid } from 'nanoid'
+import { ContactShadows } from '@react-three/drei/core/ContactShadows'
+import { OrbitControls } from '@react-three/drei/core/OrbitControls'
+import { useGLTF } from '@react-three/drei/core/Gltf'
+import { Html } from '@react-three/drei/web/Html'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 
-function BowlAndSoup() {
-  const bowlRef = useRef<THREE.Group>(null)
+const MODEL_URL = `${import.meta.env.BASE_URL}models/realistic-soup.glb`
+const TARGET = new THREE.Vector3(0, 0.36, 0)
+const INSPECT_POSITION = new THREE.Vector3(2.5, 3.1, 4.3)
+const FIELD_POSITION = new THREE.Vector3(0, 0, 10)
 
-  const outerPoints = [
-    new THREE.Vector2(0.0, 0.0),
-    new THREE.Vector2(0.7, 0.0),
-    new THREE.Vector2(0.9, 0.3),
-    new THREE.Vector2(0.85, 0.6)
-  ]
+interface SceneProps {
+  closeUp: boolean
+  paused: boolean
+  reducedMotion: boolean
+}
 
-  const innerPoints = [
-    new THREE.Vector2(0.0, 0.0),
-    new THREE.Vector2(0.68, 0.0),
-    new THREE.Vector2(0.88, 0.27),
-    new THREE.Vector2(0.83, 0.57)
-  ]
+function useSoupParts() {
+  const { scene } = useGLTF(MODEL_URL, false)
+  return useMemo(() => {
+    const parts: THREE.Mesh[] = []
+    scene.updateMatrixWorld(true)
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh) parts.push(object)
+    })
+    return parts
+  }, [scene])
+}
 
-  useFrame(() => {
-    if (!bowlRef.current) return
-    bowlRef.current.rotation.y += 0.001
-  })
-
+function StudioLighting({ shadows }: { shadows: boolean }) {
+  const { gl, scene } = useThree()
+  useEffect(() => {
+    // Local studio reflections: the model never depends on a third-party HDR URL.
+    const room = new RoomEnvironment()
+    const generator = new THREE.PMREMGenerator(gl)
+    const environment = generator.fromScene(room, 0.04)
+    scene.environment = environment.texture
+    scene.environmentIntensity = 0.5
+    room.dispose()
+    generator.dispose()
+    return () => {
+      scene.environment = null
+      environment.dispose()
+    }
+  }, [gl, scene])
   return (
-    <group ref={bowlRef}>
-      <mesh receiveShadow castShadow>
-        <latheGeometry args={[outerPoints, 32]} />
-        <meshPhysicalMaterial
-          color='#f8f8f8'
-          metalness={0.1}
-          roughness={0.4}
-          clearcoat={1}
-          clearcoatRoughness={0.2}
-        />
-      </mesh>
+    <>
+      <ambientLight intensity={0.15} />
+      <directionalLight position={[-3, 6, 4]} intensity={2.5} color='#fff1df' castShadow={shadows} shadow-mapSize={[2048, 2048]} shadow-camera-left={-2} shadow-camera-right={2} shadow-camera-top={2} shadow-camera-bottom={-2} shadow-normalBias={0.008} shadow-bias={-0.0001} />
+      <directionalLight position={[4, 3, -4]} intensity={0.8} color='#ffffff' />
+    </>
+  )
+}
 
-      <mesh receiveShadow castShadow>
-        <latheGeometry args={[innerPoints, 32]} />
-        <meshPhysicalMaterial
-          color='#ebe7e7'
-          metalness={0.05}
-          roughness={0.5}
-          clearcoat={0.8}
-          clearcoatRoughness={0.3}
-          side={THREE.BackSide}
-        />
-      </mesh>
-
-      <mesh position={[0, 0.58, 0]} receiveShadow castShadow>
-        <cylinderGeometry args={[0.69, 0.69, 0.02, 32]} />
-        <meshPhysicalMaterial color='#5c2b1c' metalness={0} roughness={0.7} />
-      </mesh>
+function Steam({ paused }: { paused: boolean }) {
+  const group = useRef<THREE.Group>(null)
+  const elapsed = useRef(0)
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 64
+    const ctx = canvas.getContext('2d')!
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+    gradient.addColorStop(0, 'rgba(255,255,255,0.35)')
+    gradient.addColorStop(0.35, 'rgba(255,255,255,0.15)')
+    gradient.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 64, 64)
+    return new THREE.CanvasTexture(canvas)
+  }, [])
+  useEffect(() => () => texture.dispose(), [texture])
+  useFrame((_, dt) => {
+    if (!group.current || paused) return
+    elapsed.current += Math.min(dt, 0.05)
+    group.current.children.forEach((child, i) => {
+      const age = (elapsed.current * 0.22 + i / 14) % 1
+      const sprite = child as THREE.Sprite
+      sprite.position.set(
+        Math.sin(i * 2.4) * 0.45 + Math.sin(age * 5 + i) * age * 0.13,
+        0.69 + age * 1.25,
+        Math.cos(i * 2.4) * 0.35,
+      )
+      sprite.scale.set(0.16 + age * 0.3, 0.3 + age * 0.7, 1)
+      ;(sprite.material as THREE.SpriteMaterial).opacity = Math.sin(age * Math.PI) * 0.28
+    })
+  })
+  return (
+    <group ref={group}>
+      {Array.from({ length: 14 }, (_, i) => (
+        <sprite key={i} position={[0, 0.7, 0]}>
+          <spriteMaterial map={texture} transparent opacity={0} depthWrite={false} />
+        </sprite>
+      ))}
     </group>
   )
 }
 
-class SteamPuff {
-  readonly id: string
-  x: number
-  y: number
-  z: number
-  age: number
-  spheres: { x: number; y: number; z: number; baseScale: number }[]
-  private static readonly LIFESPAN = 3.0
-  private static readonly FADE_IN = 0.5
-  private static readonly FADE_OUT = 0.7
-  private centerX: number
-  private centerZ: number
-  private swirlAngle: number
-  private swirlRadius: number
-  private swirlSpeed: number
-  private swirlSpeedDelta: number
-  private driftX: number
-  private driftZ: number
-
-  constructor() {
-    this.id = nanoid()
-    this.x = (Math.random() - 0.5) * 0.6
-    this.y = 0.4
-    this.z = (Math.random() - 0.5) * 0.6
-    this.age = 0
-    this.centerX = this.x
-    this.centerZ = this.z
-    this.swirlAngle = Math.random() * Math.PI * 2
-    this.swirlRadius = 0.05 + Math.random() * 0.05
-    this.swirlSpeed = 0.5 + Math.random() * 0.5
-    this.swirlSpeedDelta = (Math.random() - 0.5) * 0.1
-    this.driftX = (Math.random() - 0.5) * 0.02
-    this.driftZ = (Math.random() - 0.5) * 0.02
-
-    this.spheres = Array.from({ length: 4 }, () => ({
-      x: (Math.random() - 0.5) * 0.3,
-      y: Math.random() * 0.2,
-      z: (Math.random() - 0.5) * 0.3,
-      baseScale: 0.3 + Math.random() * 0.2
-    }))
-  }
-
-  update(delta: number) {
-    this.age += delta
-    this.swirlSpeed += this.swirlSpeedDelta * delta
-    if (this.swirlSpeed < 0.2) this.swirlSpeed = 0.2
-    if (this.swirlSpeed > 1.0) this.swirlSpeed = 1.0
-    this.swirlAngle += this.swirlSpeed * delta
-    this.x = this.centerX + this.swirlRadius * Math.cos(this.swirlAngle)
-    this.z = this.centerZ + this.swirlRadius * Math.sin(this.swirlAngle)
-    this.x += this.driftX * delta
-    this.z += this.driftZ * delta
-    this.y += delta * 0.4
-  }
-
-  isAlive(): boolean {
-    return this.age <= SteamPuff.LIFESPAN
-  }
-
-  getOpacity(): number {
-    if (this.age < SteamPuff.FADE_IN) {
-      return this.age / SteamPuff.FADE_IN
-    }
-    if (this.age > SteamPuff.LIFESPAN - SteamPuff.FADE_OUT) {
-      const fadeTime = this.age - (SteamPuff.LIFESPAN - SteamPuff.FADE_OUT)
-      return 1 - fadeTime / SteamPuff.FADE_OUT
-    }
-    return 1
-  }
-
-  getSphereScale(baseScale: number): number {
-    const minScale = 0.1 * baseScale
-    if (this.age < SteamPuff.FADE_IN) {
-      const t = this.age / SteamPuff.FADE_IN
-      return minScale + t * (baseScale - minScale)
-    }
-    return baseScale
-  }
-}
-
-function NaturalSteam() {
-  const [puffs, setPuffs] = useState<SteamPuff[]>([])
-
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-    function spawn() {
-      setPuffs((prev) => [...prev, new SteamPuff()])
-      scheduleNext()
-    }
-    function scheduleNext() {
-      const spawnDelay = 400 + Math.random() * 500
-      timeoutId = setTimeout(spawn, spawnDelay)
-    }
-    scheduleNext()
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [])
-
-  useFrame((_, delta) => {
-    setPuffs((prev) =>
-      prev
-        .map((puff) => {
-          puff.update(delta)
-          return puff
-        })
-        .filter((puff) => puff.isAlive())
-    )
-  })
-
+function CloseUpSoup({ paused }: { paused: boolean }) {
+  const parts = useSoupParts()
   return (
     <group>
-      {puffs.map((puff) => (
-        <group key={puff.id} position={[puff.x, puff.y, puff.z]}>
-          {puff.spheres.map((sphere, i) => {
-            const alpha = puff.getOpacity()
-            const scaleFactor = puff.getSphereScale(sphere.baseScale)
-            return (
-              <mesh
-                key={i}
-                position={[sphere.x, sphere.y, sphere.z]}
-                scale={[scaleFactor, scaleFactor, scaleFactor]}
-              >
-                <sphereGeometry args={[0.5, 16, 16]} />
-                <meshStandardMaterial
-                  color='#fff'
-                  transparent
-                  opacity={alpha}
-                  depthWrite={false}
-                />
-              </mesh>
-            )
-          })}
-        </group>
+      {parts.map((part) => (
+        <mesh castShadow receiveShadow key={part.uuid} geometry={part.geometry} material={part.material} matrix={part.matrixWorld} matrixAutoUpdate={false} dispose={null} />
+      ))}
+      <Steam paused={paused} />
+      <ContactShadows position={[0, -0.015, 0]} opacity={0.38} scale={7} blur={2.8} far={2} resolution={512} frames={1} color='#55331d' />
+    </group>
+  )
+}
+
+function SoupField({ paused }: { paused: boolean }) {
+  const parts = useSoupParts()
+  const { viewport, camera, size } = useThree()
+  const count = size.width < 600 ? 16 : 36
+  const instances = useRef<(THREE.InstancedMesh | null)[]>([])
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const matrix = useMemo(() => new THREE.Matrix4(), [])
+  const time = useRef(0)
+  const bowls = useMemo(() => Array.from({ length: count }, (_, i) => {
+    const z = 4 + (i / count) * 40
+    const { width, height } = viewport.getCurrentViewport(camera, [0, 0, -z])
+    // A stable distribution keeps resizing and pause/resume from respawning bowls.
+    const random = (seed: number) => THREE.MathUtils.euclideanModulo(Math.sin(seed * 127.1) * 43758.5453, 1)
+    return {
+      x: (random(i + 1) - 0.5) * width,
+      y: (random(i + 52) - 0.5) * height,
+      z, width, height,
+      angle: random(i + 100) * Math.PI * 2,
+      spin: random(i + 200) * Math.PI * 2,
+    }
+  }), [count, viewport, camera])
+
+  useFrame((_, dt) => {
+    if (!paused) time.current += Math.min(dt, 0.05)
+    bowls.forEach((bowl, i) => {
+      const t = time.current
+      const x = THREE.MathUtils.euclideanModulo(bowl.x + Math.cos(bowl.angle) * t * 0.45 + bowl.width * 0.65, bowl.width * 1.3) - bowl.width * 0.65
+      const y = THREE.MathUtils.euclideanModulo(bowl.y + Math.sin(bowl.angle) * t * 0.45 + bowl.height * 0.65, bowl.height * 1.3) - bowl.height * 0.65
+      dummy.position.set(x, y, -bowl.z)
+      dummy.rotation.set(0.55 + Math.sin(t * 0.14 + bowl.spin) * 0.65, bowl.spin + t * 0.12, Math.cos(bowl.spin + t * 0.1) * 0.35)
+      dummy.updateMatrix()
+      parts.forEach((part, partIndex) => {
+        matrix.multiplyMatrices(dummy.matrix, part.matrixWorld)
+        instances.current[partIndex]?.setMatrixAt(i, matrix)
+      })
+    })
+    instances.current.forEach((instance) => {
+      if (instance) instance.instanceMatrix.needsUpdate = true
+    })
+  })
+  return (
+    <group>
+      {parts.map((part, i) => (
+        <instancedMesh
+          key={`${part.uuid}-${count}`}
+          ref={(instance) => { instances.current[i] = instance }}
+          args={[part.geometry, part.material, count]}
+          frustumCulled={false}
+          dispose={null}
+        />
       ))}
     </group>
   )
 }
 
-interface SoupProps {
-  index: number
-  z: number
-  speed: number
-}
-
-function Soup({ index, z, speed }: SoupProps) {
-  const ref = useRef<THREE.Group | null>(null)
-  const { viewport, camera } = useThree()
-  const { width, height } = viewport.getCurrentViewport(camera, [0, 0, -z])
-
-  function getSpawnInside(width: number, height: number) {
-    return {
-      x: THREE.MathUtils.randFloatSpread(width),
-      y: THREE.MathUtils.randFloatSpread(height),
-      angle: Math.random() * Math.PI * 2
-    }
-  }
-
-  function getSpawnEdgeInward(width: number, height: number) {
-    const side = Math.floor(Math.random() * 4) // 0=top,1=bottom,2=left,3=right
-    let x = 0
-    let y = 0
-
-    if (side === 0) {
-      // top edge
-      x = THREE.MathUtils.randFloatSpread(width * 2)
-      y = height * 1.2
-    } else if (side === 1) {
-      // bottom edge
-      x = THREE.MathUtils.randFloatSpread(width * 2)
-      y = -height * 1.2
-    } else if (side === 2) {
-      // left edge
-      x = -width * 1.2
-      y = THREE.MathUtils.randFloatSpread(height * 2)
-    } else {
-      // right edge
-      x = width * 1.2
-      y = THREE.MathUtils.randFloatSpread(height * 2)
-    }
-
-    // Force angle to point roughly toward center (0,0).
-    const angle = Math.atan2(0 - y, 0 - x)
-
-    return { x, y, angle }
-  }
-
-  const [data, setData] = useState(() => {
-    const { x, y, angle } = getSpawnInside(width, height)
-    return {
-      x,
-      y,
-      angle,
-      spin: THREE.MathUtils.randFloat(1, 2),
-      rX: Math.random() * Math.PI,
-      rZ: Math.random() * Math.PI
-    }
-  })
-
-  // Called when soup leaves the screen, to respawn on an edge inward
-  function respawn() {
-    const { x, y, angle } = getSpawnEdgeInward(width, height)
-    setData((prev) => ({
-      ...prev,
-      x,
-      y,
-      angle,
-      spin: THREE.MathUtils.randFloat(1, 2),
-      rX: Math.random() * Math.PI,
-      rZ: Math.random() * Math.PI
-    }))
-  }
-
-  useFrame((state, dt) => {
-    if (!ref.current || dt > 0.1) return
-
-    // Move in direction of data.angle
-    const moveX = Math.cos(data.angle) * speed * dt
-    const moveY = Math.sin(data.angle) * speed * dt
-
-    data.x += moveX
-    data.y += moveY
-
-    ref.current.position.set(data.x, data.y, -z)
-    ref.current.rotation.set(
-      (data.rX += dt / data.spin),
-      Math.sin(index * 1000 + state.clock.elapsedTime / 10) * Math.PI,
-      (data.rZ += dt / data.spin)
-    )
-
-    // If off-screen, respawn on a random edge traveling inward
-    const offX = width * 1.3
-    const offY = height * 1.3
-    if (data.x < -offX || data.x > offX || data.y < -offY || data.y > offY) {
-      respawn()
-    }
-  })
-
+function Scene({ closeUp, paused, reducedMotion }: SceneProps) {
+  const { camera, size, invalidate } = useThree()
+  useEffect(() => {
+    const perspective = camera as THREE.PerspectiveCamera
+    perspective.position.copy(closeUp ? INSPECT_POSITION : FIELD_POSITION)
+    // Keep the complete bowl in frame on portrait phones.
+    perspective.fov = closeUp ? (size.width < 600 ? 56 : 34) : 24
+    perspective.lookAt(closeUp ? TARGET : new THREE.Vector3())
+    perspective.updateProjectionMatrix()
+    invalidate()
+  }, [camera, closeUp, size.width, invalidate])
   return (
-    <group ref={ref}>
-      <BowlAndSoup />
-      <NaturalSteam />
-    </group>
+    <>
+      <color attach='background' args={[closeUp ? '#f2e5cf' : '#ffbf40']} />
+      <StudioLighting shadows={closeUp} />
+      <Suspense fallback={<Html center><div className='loading' role='status'>Simmering…</div></Html>}>
+        {closeUp ? <CloseUpSoup paused={paused || reducedMotion} /> : <SoupField paused={paused || reducedMotion} />}
+      </Suspense>
+      {closeUp && <OrbitControls key='inspect' target={TARGET} enablePan={false} minDistance={3.3} maxDistance={8} minPolarAngle={0.18} maxPolarAngle={Math.PI / 2 - 0.03} autoRotate={!paused && !reducedMotion} autoRotateSpeed={0.35} />}
+    </>
   )
 }
 
-interface FloatingSoupsProps {
-  speed?: number
-  count?: number
-  depth?: number
-  easing?: (x: number) => number
-}
-
-export default function FloatingSoups({
-  speed = 1,
-  count = 60,
-  depth = 70,
-  easing = (x: number) => Math.sqrt(1 - Math.pow(x - 1, 2))
-}: FloatingSoupsProps) {
+export default function FloatingSoups(props: SceneProps) {
   return (
     <Canvas
-      flat
-      gl={{ antialias: false }}
+      shadows
+      frameloop={props.paused || props.reducedMotion ? 'demand' : 'always'}
+      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
       dpr={[1, 1.5]}
-      camera={{ position: [0, 0, 10], fov: 20, near: 0.01, far: depth + 15 }}
+      camera={{ position: [0, 0, 10], fov: 24, near: 0.1, far: 100 }}
+      aria-label={props.closeUp ? 'Interactive realistic noodle soup. Drag to orbit and scroll to zoom.' : 'Floating bowls of realistic noodle soup.'}
+      fallback={<p className='loading'>Your browser needs WebGL to serve this soup.</p>}
     >
-      <color attach='background' args={['#ffbf40']} />
-      <spotLight
-        position={[10, 20, 10]}
-        penumbra={1}
-        decay={0}
-        intensity={3}
-        color='orange'
-      />
-
-      {Array.from({ length: count }, (_, i) => (
-        <Soup
-          key={i}
-          index={i}
-          z={Math.round(easing(i / count) * depth)}
-          speed={speed}
-        />
-      ))}
-
-      <Environment preset='sunset' />
-
-      <EffectComposer multisampling={0} enableNormalPass={false}>
-        <DepthOfField
-          target={[0, 0, 60]}
-          focalLength={0.4}
-          bokehScale={14}
-          height={700}
-        />
-        <ToneMapping />
-      </EffectComposer>
+      <Scene {...props} />
     </Canvas>
   )
 }

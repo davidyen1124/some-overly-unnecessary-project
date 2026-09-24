@@ -1,9 +1,45 @@
-html,
-body,
-#root {
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
+:root { font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #3d2818; background: #ffbf40; font-synthesis: none; }
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible { outline: 3px solid #8a3915; outline-offset: 5px; }
+.soup-app { height: 100%; height: 100dvh; width: 100%; position: relative; }
+.masthead { position: absolute; top: max(30px, env(safe-area-inset-top)); left: 36px; pointer-events: none; }
+h1 { margin: 0; font-size: 29px; letter-spacing: -.07em; font-weight: 850; }
+.masthead p { font-size: 11px; letter-spacing: .025em; margin: 7px 0 0; }
+.scene-caption { position: absolute; bottom: 112px; left: 20px; right: 20px; text-align: center; pointer-events: none; font-size: 12px; letter-spacing: .02em; }
+.scene-caption small { display: block; margin-top: 7px; font-size: 11px; color: #745b43; }
+.controls { position: absolute; bottom: max(38px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 6px; border: 1px solid #ffffff90; border-radius: 50px; background: #fff7e7e8; box-shadow: 0 4px 25px #65401a14; white-space: nowrap; }
+.controls button { border: 0; background: transparent; color: #62452c; border-radius: 30px; padding: 12px 18px; font-size: 12px; transition: background .15s, color .15s; }
+.controls button:hover { background: #e9d9be; }
+.controls button.selected { color: #fff7e7; background: #422c1b; }
+.controls button:disabled { opacity: .45; cursor: default; }
+.control-divider { width: 1px; height: 18px; margin: 0 3px; background: #dbc6a8; }
+.model-link { position: absolute; right: 32px; top: 32px; color: #422c1b; font-size: 12px; text-decoration: none; text-align: right; }
+.model-link span { display: block; font-size: 10px; margin-top: 5px; color: #745128; }
+.model-link:hover { text-decoration: underline; }
+.loading { background: #fff7e7; color: #422c1b; border-radius: 30px; padding: 15px 24px; white-space: nowrap; font-size: 14px; }
+.scene-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; text-align: center; }
+.scene-error button { border: 1px solid; border-radius: 24px; background: #fff7e7; padding: 12px 20px; }
+@media (max-width: 600px) {
+  .masthead { top: max(24px, env(safe-area-inset-top)); left: 22px; }
+  h1 { font-size: 25px; }
+  .masthead p { font-size: 9px; }
+  .model-link { right: 20px; top: 28px; font-size: 10px; }
+  .model-link span { max-width: 70px; font-size: 9px; }
+  .controls { bottom: max(30px, env(safe-area-inset-bottom)); }
+  .controls button { padding: 12px 15px; }
+  .scene-caption { bottom: 103px; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+.soup-app:not(.close-up)::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#ffbf40e8 0, #ffbf4000 140px, #ffbf4000 calc(100% - 175px), #ffbf40e8 100%); }
+.masthead, .scene-caption, .controls, .model-link { z-index: 1; }
+
+@media (max-height: 500px) {
+  .masthead { top: 18px; }
+  .model-link { top: 22px; }
+  .controls { bottom: max(16px, env(safe-area-inset-bottom)); }
+  .scene-caption { display: none; }
 }
